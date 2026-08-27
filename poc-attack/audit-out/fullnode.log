@@ -1,0 +1,27 @@
+mkdir: created directory '/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode'
+mkdir: created directory '/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/'
+===== reset ====
+/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/pid not exist
+INFO [08-27|06:53:31.692] Maximum peer count                       ETH=50 total=50
+INFO [08-27|06:53:31.694] Smartcard socket not found, disabling    err="stat /run/pcscd/pcscd.comm: no such file or directory"
+INFO [08-27|06:53:31.697] Sanitizing Go's GC trigger               percent=25
+INFO [08-27|06:53:31.699] Use CLI state scheme                     CLI=path
+INFO [08-27|06:53:31.701] Set global gas cap                       cap=50,000,000
+INFO [08-27|06:53:31.702] Initializing the KZG library             backend=gokzg
+INFO [08-27|06:53:34.151] Defaulting to pebble as the backing database
+INFO [08-27|06:53:34.151] Allocated cache and file handles         database=/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/geth/chaindata cache=1.60GiB handles=262,144
+INFO [08-27|06:53:34.151] Allocated memory table size              database=/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/geth/chaindata "memory table"=136.50MiB
+INFO [08-27|06:53:34.200] Opened ancient database                  database=/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/geth/chaindata/ancient/chain readonly=false tail=0 frozen=0
+INFO [08-27|06:53:34.200] Opened Era store                         datadir=/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/geth/chaindata/ancient/chain/era
+INFO [08-27|06:53:34.200] State scheme set by user                 scheme=path
+INFO [08-27|06:53:34.200] Load database journal from disk
+INFO [08-27|06:53:34.231] Opened ancient database                  database=/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/geth/chaindata/ancient/state readonly=false tail=0 frozen=0
+INFO [08-27|06:53:34.231] State snapshot generator is not found
+INFO [08-27|06:53:34.231] Starting snapshot generation             root=56e81f..63b421 accounts=0 slots=0 storage=0.00B dangling=0 elapsed="3.046µs"
+INFO [08-27|06:53:34.231] Initialized path database                triecache=16.00MiB statecache=16.00MiB buffer=64.00MiB state-history="last 600000 blocks" journal-dir=/workspaces/reth-bsc/poc-attack/node-deploy/.local/fullnode/node0/geth/triedb
+INFO [08-27|06:53:34.231] Writing custom genesis block
+INFO [08-27|06:53:34.231] Resuming snapshot generation             root=56e81f..63b421 accounts=0 slots=0 storage=0.00B dangling=0 elapsed="236.286µs"
+INFO [08-27|06:53:34.231] Generated snapshot                       accounts=0 slots=0 storage=0.00B dangling=0 elapsed="376.638µs"
+INFO [08-27|06:53:34.261] genesis block hash                       hash=ece462..cdfdee
+INFO [08-27|06:53:34.261] Successfully wrote genesis state         hash=0xece462446f621a7dbba4cb2bb1e04f74e3b861274511c6417146fbca9acdfdee
+===== end ====

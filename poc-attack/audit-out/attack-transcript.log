@@ -1,0 +1,139 @@
+ATTACKER STARTED
+ENODE: enode://95b123fa84bce0617b3e2e143cc9649082f84dd6b5d5c09db06d7565ddeff7a914d3cb7fd3766e9215c45945e1bc0d1ce951091e96627c78b4b535bf49a4d1fe@127.0.0.1:31337
+DEBUG[08-27|06:53:52.140] TCP listener up                          addr=[::]:31337
+INFO [08-27|06:53:52.141] New local node record                    seq=1,787,813,632,141 id=983df93f2359be4b ip=127.0.0.1 udp=0 tcp=31337
+INFO [08-27|06:53:52.141] Started P2P networking                   self="enode://95b123fa84bce0617b3e2e143cc9649082f84dd6b5d5c09db06d7565ddeff7a914d3cb7fd3766e9215c45945e1bc0d1ce951091e96627c78b4b535bf49a4d1fe@127.0.0.1:31337?discport=0"
+INFO [08-27|06:53:52.143] admin_addPeer                            result=true
+INFO [08-27|06:53:52.844] admin_addPeer                            result=true
+INFO [08-27|06:53:53.546] admin_addPeer                            result=true
+TRACE[08-27|06:53:53.679] Accepted connection                      addr=127.0.0.1:51890
+DEBUG[08-27|06:53:53.680] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:51890 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:53:53.680] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:53:53.680] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:53:53.681] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:53:53.681] sync-dump diterima dari victim           votes=36 attacker_hits=0
+INFO [08-27|06:53:53.681] eth/68 status MIRRORED                   network=714
+ARMED: 2
+WARN [08-27|06:53:54.247] "=== FASE 1: OBSERVE (normal flow — LOGIC_GATE_4) ===" 
+INFO [08-27|06:53:55.098] window                                   phase=observe head=768 fin_before=767 fin_after=768 premature_forged=false late_or_organic=false
+INFO [08-27|06:53:58.021] window                                   phase=observe head=769 fin_before=768 fin_after=768 premature_forged=false late_or_organic=false
+WARN [08-27|06:53:58.021] "CHECKPOINT-1 OK — finality organik bergerak; window steady-state TERBUKA" 
+WARN [08-27|06:53:58.022] "=== FASE 2: CONTROL (target_hash acak — harus no-op) ===" 
+INFO [08-27|06:53:58.147] window                                   phase=control head=770 fin_before=768 fin_after=769 premature_forged=true  late_or_organic=false
+ERROR[08-27|06:53:58.147] "ANOMALI CONTROL — finality berubah tanpa target_hash valid" 
+WARN [08-27|06:53:58.147] "=== FASE 3: ATTACK (quorum envelope garbage per head, 0 signature valid) ===" 
+INFO [08-27|06:54:01.068] window                                   phase=attack  head=770 fin_before=769 fin_after=770 premature_forged=false late_or_organic=false
+DEBUG[08-27|06:54:03.682] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.002s req=false err=EOF
+INFO [08-27|06:54:03.683] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:54:03.683] Accepted connection                      addr=127.0.0.1:58714
+DEBUG[08-27|06:54:03.684] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:58714 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:54:03.684] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:54:03.684] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:54:03.684] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:54:03.684] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:54:03.684] sync-dump diterima dari victim           votes=50 attacker_hits=6
+INFO [08-27|06:54:06.055] window                                   phase=attack  head=771 fin_before=770 fin_after=770 premature_forged=false late_or_organic=false
+INFO [08-27|06:54:06.178] window                                   phase=attack  head=772 fin_before=770 fin_after=771 premature_forged=true  late_or_organic=false
+INFO [08-27|06:54:12.113] window                                   phase=attack  head=773 fin_before=772 fin_after=773 premature_forged=false late_or_organic=false
+DEBUG[08-27|06:54:13.685] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:54:13.685] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:54:13.685] Accepted connection                      addr=127.0.0.1:44126
+DEBUG[08-27|06:54:13.687] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:44126 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:54:13.687] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:54:13.687] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:54:13.687] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:54:13.687] sync-dump diterima dari victim           votes=62 attacker_hits=12
+INFO [08-27|06:54:13.687] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:54:20.137] window                                   phase=attack  head=774 fin_before=773 fin_after=773 premature_forged=false late_or_organic=false
+DEBUG[08-27|06:54:23.688] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+TRACE[08-27|06:54:23.688] Accepted connection                      addr=127.0.0.1:46406
+INFO [08-27|06:54:23.688] Looking for peers                        peercount=0 tried=0 static=0
+DEBUG[08-27|06:54:23.689] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:46406 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:54:23.689] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:54:23.690] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:54:23.690] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:54:23.690] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:54:23.690] sync-dump diterima dari victim           votes=62 attacker_hits=12
+DEBUG[08-27|06:54:33.692] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.002s req=false err=EOF
+INFO [08-27|06:54:33.692] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:54:33.692] Accepted connection                      addr=127.0.0.1:44614
+DEBUG[08-27|06:54:33.693] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:44614 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:54:33.693] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:54:33.693] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:54:33.694] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:54:33.694] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:54:33.694] sync-dump diterima dari victim           votes=62 attacker_hits=12
+DEBUG[08-27|06:54:43.695] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.002s req=false err=EOF
+INFO [08-27|06:54:43.696] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:54:43.696] Accepted connection                      addr=127.0.0.1:42008
+DEBUG[08-27|06:54:43.697] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:42008 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:54:43.697] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:54:43.697] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:54:43.698] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:54:43.698] sync-dump diterima dari victim           votes=62 attacker_hits=12
+INFO [08-27|06:54:43.698] eth/68 status MIRRORED                   network=714
+DEBUG[08-27|06:54:53.699] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.002s req=false err=EOF
+INFO [08-27|06:54:53.700] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:54:53.700] Accepted connection                      addr=127.0.0.1:40716
+DEBUG[08-27|06:54:53.701] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:40716 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:54:53.701] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:54:53.701] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:54:53.701] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:54:53.701] sync-dump diterima dari victim           votes=62 attacker_hits=12
+INFO [08-27|06:54:53.702] eth/68 status MIRRORED                   network=714
+DEBUG[08-27|06:55:03.702] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:55:03.702] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:55:03.702] Accepted connection                      addr=127.0.0.1:46304
+DEBUG[08-27|06:55:03.704] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:46304 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:55:03.704] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:55:03.704] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:55:03.704] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:55:03.704] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:55:03.704] sync-dump diterima dari victim           votes=62 attacker_hits=12
+DEBUG[08-27|06:55:13.705] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:55:13.705] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:55:13.705] Accepted connection                      addr=127.0.0.1:32882
+DEBUG[08-27|06:55:13.706] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:32882 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:55:13.706] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:55:13.706] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:55:13.706] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:55:13.707] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:55:13.707] sync-dump diterima dari victim           votes=62 attacker_hits=12
+DEBUG[08-27|06:55:23.708] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:55:23.708] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:55:23.708] Accepted connection                      addr=127.0.0.1:49390
+DEBUG[08-27|06:55:23.709] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:49390 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:55:23.709] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:55:23.709] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:55:23.709] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:55:23.710] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:55:23.710] sync-dump diterima dari victim           votes=62 attacker_hits=12
+DEBUG[08-27|06:55:33.711] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.002s req=false err=EOF
+INFO [08-27|06:55:33.712] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:55:33.712] Accepted connection                      addr=127.0.0.1:39422
+DEBUG[08-27|06:55:33.713] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:39422 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:55:33.713] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:55:33.713] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:55:33.713] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:55:33.713] sync-dump diterima dari victim           votes=62 attacker_hits=12
+INFO [08-27|06:55:33.713] eth/68 status MIRRORED                   network=714
+DEBUG[08-27|06:55:43.714] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:55:43.714] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:55:43.714] Accepted connection                      addr=127.0.0.1:58124
+DEBUG[08-27|06:55:43.715] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:58124 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:55:43.715] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:55:43.715] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:55:43.715] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:55:43.716] eth/68 status MIRRORED                   network=714
+INFO [08-27|06:55:43.716] sync-dump diterima dari victim           votes=62 attacker_hits=12
+DEBUG[08-27|06:55:53.717] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:55:53.717] Looking for peers                        peercount=0 tried=0 static=0
+TRACE[08-27|06:55:53.717] Accepted connection                      addr=127.0.0.1:47090
+DEBUG[08-27|06:55:53.718] Adding p2p peer                          peercount=1 id=0b1955c22b0dfae8 conn=inbound addr=127.0.0.1:47090 name=reth-bsc/v0.1.0-unkn...
+TRACE[08-27|06:55:53.718] Starting protocol bsc/2                  id=0b1955c22b0dfae8 conn=inbound
+TRACE[08-27|06:55:53.718] Starting protocol eth/68                 id=0b1955c22b0dfae8 conn=inbound
+WARN [08-27|06:55:53.718] "bsc/2 handshake ESTABLISHED — NOL autentikasi" peer=0b1955c22b0dfae8
+INFO [08-27|06:55:53.718] sync-dump diterima dari victim           votes=62 attacker_hits=12
+INFO [08-27|06:55:53.719] eth/68 status MIRRORED                   network=714
+DEBUG[08-27|06:56:03.720] Removing p2p peer                        peercount=0 id=0b1955c22b0dfae8 duration=10.001s req=false err=EOF
+INFO [08-27|06:56:03.720] Looking for peers                        peercount=0 tried=0 static=0

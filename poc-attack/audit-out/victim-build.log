@@ -1,0 +1,98 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.51kB 0.0s done
+#1 DONE 0.1s
+
+#2 [auth] docker/dockerfile:pull token for registry-1.docker.io
+#2 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.7-labs
+#3 DONE 1.1s
+
+#4 docker-image://docker.io/docker/dockerfile:1.7-labs@sha256:b99fecfe00268a8b556fad7d9c37ee25d716ae08a5d7320e6d51c4dd83246894
+#4 resolve docker.io/docker/dockerfile:1.7-labs@sha256:b99fecfe00268a8b556fad7d9c37ee25d716ae08a5d7320e6d51c4dd83246894 0.0s done
+#4 CACHED
+
+#5 [internal] load metadata for docker.io/lukemathwalker/cargo-chef:latest-rust-1
+#5 ...
+
+#6 [auth] lukemathwalker/cargo-chef:pull token for registry-1.docker.io
+#6 DONE 0.0s
+
+#7 [auth] library/ubuntu:pull token for registry-1.docker.io
+#7 DONE 0.0s
+
+#8 [internal] load metadata for docker.io/library/ubuntu:latest
+#8 DONE 1.1s
+
+#5 [internal] load metadata for docker.io/lukemathwalker/cargo-chef:latest-rust-1
+#5 DONE 1.1s
+
+#9 [internal] load .dockerignore
+#9 transferring context: 91B done
+#9 DONE 0.0s
+
+#10 [internal] load build context
+#10 transferring context: 31.22kB 0.0s done
+#10 DONE 0.0s
+
+#11 [runtime 1/4] FROM docker.io/library/ubuntu:latest@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
+#11 resolve docker.io/library/ubuntu:latest@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
+#11 resolve docker.io/library/ubuntu:latest@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b 0.0s done
+#11 DONE 0.1s
+
+#12 [chef 1/3] FROM docker.io/lukemathwalker/cargo-chef:latest-rust-1@sha256:d21902576546863995017609e991178939e6f151f6b35fb00f3c0fa97a616ef5
+#12 resolve docker.io/lukemathwalker/cargo-chef:latest-rust-1@sha256:d21902576546863995017609e991178939e6f151f6b35fb00f3c0fa97a616ef5 0.1s done
+#12 DONE 0.1s
+
+#13 [chef 2/3] WORKDIR /app
+#13 CACHED
+
+#14 [chef 3/3] RUN apt-get update && apt-get -y upgrade && apt-get install -y libclang-dev pkg-config
+#14 CACHED
+
+#15 [planner 1/2] COPY --exclude=.git --exclude=dist . .
+#15 DONE 0.4s
+
+#16 [planner 2/2] RUN cargo chef prepare --recipe-path recipe.json
+#16 DONE 0.4s
+
+#17 [builder 1/5] COPY --from=planner /app/recipe.json recipe.json
+#17 CACHED
+
+#18 [builder 2/5] RUN cargo chef cook --profile release --features "jemalloc,asm-keccak" --recipe-path recipe.json
+#18 CACHED
+
+#19 [builder 3/5] COPY --exclude=dist . .
+#19 DONE 0.5s
+
+#20 [builder 4/5] RUN cargo build --bin reth-bsc --profile release --features "jemalloc,asm-keccak"
+#20 11.36    Compiling reth_bsc v0.1.0 (/app)
+#20 559.2     Finished `release` profile [optimized] target(s) in 9m 18s
+#20 559.2 warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+#20 559.2 note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+#20 DONE 561.8s
+
+#21 [builder 5/5] RUN cp /app/target/release/reth-bsc /app/reth-bsc
+#21 DONE 2.6s
+
+#22 [runtime 2/4] WORKDIR /app
+#22 CACHED
+
+#23 [runtime 3/4] COPY --from=builder /app/reth-bsc /usr/local/bin
+#23 CACHED
+
+#24 [runtime 4/4] COPY LICENSE* ./
+#24 CACHED
+
+#25 exporting to image
+#25 exporting layers done
+#25 exporting manifest sha256:7c27659137fbb5e568799e2a28209d897b82aa7e2aedbd234bd8c4d4d4a6bca1 done
+#25 exporting config sha256:0e6242d2f8661dffdf6b536951737c1b033cc5bf1c3d30879a41d555463b3e4c done
+#25 exporting attestation manifest sha256:f57b52b6c622ef644fced6cd8bcccd016252dc93d95c54ce5c260d5a9651b4de 0.0s done
+#25 exporting manifest list sha256:f22a438cde9df3301b76a3f2bc08a2528a07d6d2cf915c33512b34b0cf87d563 0.0s done
+#25 naming to docker.io/library/reth-bsc-poc:latest
+#25 naming to docker.io/library/reth-bsc-poc:latest done
+#25 unpacking to docker.io/library/reth-bsc-poc:latest 0.0s done
+#25 DONE 0.1s

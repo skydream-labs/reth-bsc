@@ -1,0 +1,3 @@
+cargo build --bin reth-bsc --features "jemalloc,asm-keccak" --profile "release"
+/bin/sh: 1: cargo: not found
+make: *** [Makefile:14: build] Error 127

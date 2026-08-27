@@ -1,0 +1,33 @@
+=== OUTAGE START Thu Aug 27 06:53:59 UTC 2026 ===
+06:54:29 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+    >>> DIVERGENSI pertama: victim=773 (0xfcb5f61d3c0b906627728cf9d89d9c342ac8d4fb13bc269413224b6f066afd48) vs kontrol=772 (0x0973ec6590f25d10234e9d42a4be63a7acc02ee0a352d466ff70ffdb793f4e5a) <<<
+06:54:30 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:31 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:32 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:33 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:34 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:35 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:37 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:38 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:39 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:40 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:41 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:42 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:43 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:44 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:45 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:47 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:48 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:49 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:50 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:51 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:52 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:53 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:54 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:55 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:57 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:58 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:54:59 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:55:00 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+06:55:01 head_v=774 fin_v=773 head_c=774 fin_c=772 delta=1
+=== OUTAGE END (monitor) Thu Aug 27 06:55:01 UTC 2026 ===

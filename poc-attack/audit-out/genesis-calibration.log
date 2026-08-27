@@ -1,0 +1,4 @@
+[surgery v9] mode='' ft=1787820215 (wall+7200) block8group=1M
+    SANITY:none        geth=0xece462446f621a7dbba4cb2bb1e04f74e3b861274511c6417146fbca9acdfdee reth=0xece462446f621a7dbba4cb2bb1e04f74e3b861274511c6417146fbca9acdfdee
+[surgery v9] mode='-plato' ft=1787820223 (wall+7200) block8group=1M
+    -plato             geth=0xece462446f621a7dbba4cb2bb1e04f74e3b861274511c6417146fbca9acdfdee reth=0xece462446f621a7dbba4cb2bb1e04f74e3b861274511c6417146fbca9acdfdee  MATCH

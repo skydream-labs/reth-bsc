@@ -1,0 +1,11 @@
+=== [V1] attacker window di head 773/774 (momum forge) ===
+36:INFO [08-27|06:54:06.178] window                                   phase=attack  head=772 fin_before=770 fin_after=771 premature_forged=true  late_or_organic=false
+37:INFO [08-27|06:54:12.113] window                                   phase=attack  head=773 fin_before=772 fin_after=773 premature_forged=false late_or_organic=false
+47:INFO [08-27|06:54:20.137] window                                   phase=attack  head=774 fin_before=773 fin_after=773 premature_forged=false late_or_organic=false
+
+=== [V2] victim: jalur finality aktif di 06:54:2x ===
+
+=== [V3] hits akhir ===
+attacker_hits=12
+attacker_hits=12
+attacker_hits=12
